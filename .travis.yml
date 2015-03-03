@@ -1,0 +1,15 @@
+language: java
+script: gradle dist
+
+install:
+- echo sonatypeUsername=none >> gradle.properties
+- echo sonatypePassword=none >> gradle.properties
+
+deploy:
+  provider: releases
+  api_key:
+    secure: iRYL/GZQGxPQjjLogtNqj6EQXM5zEoFYUn0Py6uNVOnBjYfnWTdAabYTSUZjjqwMw/xKJgUUStR3A5YAziB6Rla0MQZSYwzUTzqY7MB0FYZvDvvHBhSbLQHiBSUt6WLVosb0Mu4OYeeRxqcRSObgW7xK9HF+7/oKSBPvZgW5CzQ=
+  file: build/distributions/xmlcalabash1-xcc-$TRAVIS_TAG.zip
+  on:
+    tags: true
+    all_branches: true
