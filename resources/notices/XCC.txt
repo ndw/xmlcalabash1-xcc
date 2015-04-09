@@ -1,0 +1,6 @@
+Use of XCC or other intellectual property or confidential information
+of MarkLogic for competitive analysis or reverse engineering in
+connection with development of products that are the same or similar
+to MarkLogic's products licensed herein is strictly prohibited. Use of
+XCC in combination with a Community License, Trial License, or
+Academic License for commercial use is strictly prohibited.
