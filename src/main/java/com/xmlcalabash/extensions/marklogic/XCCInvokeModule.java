@@ -1,6 +1,7 @@
 package com.xmlcalabash.extensions.marklogic;
 
 import com.xmlcalabash.core.XMLCalabash;
+import com.xmlcalabash.util.XProcURIResolver;
 import net.sf.saxon.s9api.*;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.Configuration;
@@ -17,12 +18,19 @@ import com.marklogic.xcc.*;
 import com.marklogic.xcc.types.*;
 import com.marklogic.xcc.types.XdmItem;
 
+import javax.xml.transform.Source;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.URIResolver;
 import javax.xml.transform.sax.SAXSource;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.io.StringReader;
+import java.net.URL;
 import java.util.Hashtable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
 
@@ -48,6 +56,8 @@ public class XCCInvokeModule extends DefaultStep {
     private static final QName _wrapper = new QName("","wrapper");
     private static final QName _module = new QName("","module");
     private static final QName _auth_method = new QName("auth-method");
+
+    private static final String library_xpl = "http://xmlcalabash.com/extension/steps/marklogic-xcc.xpl";
 
     private WritablePipe result = null;
     private Hashtable<QName,String> params = new Hashtable<QName, String> ();
@@ -149,5 +159,48 @@ public class XCCInvokeModule extends DefaultStep {
     private XdmNode parseString(String xml) {
         StringReader sr = new StringReader(xml);
         return runtime.parse(new InputSource(sr));
+    }
+
+    public static void configureStep(XProcRuntime runtime) {
+        XProcURIResolver resolver = runtime.getResolver();
+        URIResolver uriResolver = resolver.getUnderlyingURIResolver();
+        URIResolver myResolver = new StepResolver(uriResolver);
+        resolver.setUnderlyingURIResolver(myResolver);
+    }
+
+    private static class StepResolver implements URIResolver {
+        Logger logger = LoggerFactory.getLogger(XCCInvokeModule.class);
+        URIResolver nextResolver = null;
+
+        public StepResolver(URIResolver next) {
+            nextResolver = next;
+        }
+
+        @Override
+        public Source resolve(String href, String base) throws TransformerException {
+            try {
+                URI baseURI = new URI(base);
+                URI xpl = baseURI.resolve(href);
+                if (library_xpl.equals(xpl.toASCIIString())) {
+                    URL url = XCCInvokeModule.class.getResource("/library.xpl");
+                    logger.debug("Reading library.xpl for ml:invoke-module from " + url);
+                    InputStream s = XCCInvokeModule.class.getResourceAsStream("/library.xpl");
+                    if (s != null) {
+                        SAXSource source = new SAXSource(new InputSource(s));
+                        return source;
+                    } else {
+                        logger.info("Failed to read library.xpl for ml:invoke-module");
+                    }
+                }
+            } catch (URISyntaxException e) {
+                // nevermind
+            }
+
+            if (nextResolver != null) {
+                return nextResolver.resolve(href, base);
+            } else {
+                return null;
+            }
+        }
     }
 }

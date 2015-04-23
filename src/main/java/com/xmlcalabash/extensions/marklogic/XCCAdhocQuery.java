@@ -15,6 +15,7 @@ import com.marklogic.xcc.types.XdmElement;
 import com.marklogic.xcc.types.XdmVariable;
 import com.xmlcalabash.core.XMLCalabash;
 import com.xmlcalabash.util.Base64;
+import com.xmlcalabash.util.XProcURIResolver;
 import net.sf.saxon.s9api.DocumentBuilder;
 import net.sf.saxon.s9api.QName;
 import net.sf.saxon.s9api.SaxonApiException;
@@ -31,10 +32,19 @@ import com.xmlcalabash.util.TreeWriter;
 import com.xmlcalabash.model.RuntimeValue;
 import com.marklogic.xcc.types.XdmItem;
 
+import javax.xml.transform.Source;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.URIResolver;
 import javax.xml.transform.sax.SAXSource;
+import java.io.InputStream;
 import java.io.StringReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Hashtable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
 /**
@@ -59,6 +69,8 @@ public class XCCAdhocQuery extends DefaultStep {
     private static final QName _encoding = new QName("encoding");
     private static final QName _auth_method = new QName("auth-method");
     private static final QName c_encoding = new QName("c", XProcConstants.NS_XPROC_STEP, "encoding");
+
+    private static final String library_xpl = "http://xmlcalabash.com/extension/steps/marklogic-xcc.xpl";
 
     private ReadablePipe source = null;
     private WritablePipe result = null;
@@ -185,6 +197,49 @@ public class XCCAdhocQuery extends DefaultStep {
     private XdmNode parseString(String xml) {
         StringReader sr = new StringReader(xml);
         return runtime.parse(new InputSource(sr));
+    }
+
+    public static void configureStep(XProcRuntime runtime) {
+        XProcURIResolver resolver = runtime.getResolver();
+        URIResolver uriResolver = resolver.getUnderlyingURIResolver();
+        URIResolver myResolver = new StepResolver(uriResolver);
+        resolver.setUnderlyingURIResolver(myResolver);
+    }
+
+    private static class StepResolver implements URIResolver {
+        Logger logger = LoggerFactory.getLogger(XCCAdhocQuery.class);
+        URIResolver nextResolver = null;
+
+        public StepResolver(URIResolver next) {
+            nextResolver = next;
+        }
+
+        @Override
+        public Source resolve(String href, String base) throws TransformerException {
+            try {
+                URI baseURI = new URI(base);
+                URI xpl = baseURI.resolve(href);
+                if (library_xpl.equals(xpl.toASCIIString())) {
+                    URL url = XCCAdhocQuery.class.getResource("/library.xpl");
+                    logger.debug("Reading library.xpl for ml:adhoc-query from " + url);
+                    InputStream s = XCCAdhocQuery.class.getResourceAsStream("/library.xpl");
+                    if (s != null) {
+                        SAXSource source = new SAXSource(new InputSource(s));
+                        return source;
+                    } else {
+                        logger.info("Failed to read library.xpl for ml:adhoc-query");
+                    }
+                }
+            } catch (URISyntaxException e) {
+                // nevermind
+            }
+
+            if (nextResolver != null) {
+                return nextResolver.resolve(href, base);
+            } else {
+                return null;
+            }
+        }
     }
 }
 

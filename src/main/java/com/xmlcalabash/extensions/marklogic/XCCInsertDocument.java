@@ -3,6 +3,7 @@ package com.xmlcalabash.extensions.marklogic;
 import com.xmlcalabash.core.XMLCalabash;
 import com.xmlcalabash.util.Base64;
 import com.xmlcalabash.util.S9apiUtils;
+import com.xmlcalabash.util.XProcURIResolver;
 import net.sf.saxon.s9api.*;
 import net.sf.saxon.s9api.XdmNode;
 import net.sf.saxon.Configuration;
@@ -19,13 +20,19 @@ import com.marklogic.xcc.*;
 import com.marklogic.xcc.types.*;
 import com.marklogic.xcc.types.XdmItem;
 
+import javax.xml.transform.Source;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.URIResolver;
 import javax.xml.transform.sax.SAXSource;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.io.*;
+import java.net.URL;
 import java.util.Hashtable;
 import java.util.Locale;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.InputSource;
 
 
@@ -55,6 +62,8 @@ public class XCCInsertDocument extends DefaultStep {
     private static final QName _uri = new QName("","uri");
     private static final QName _encoding = new QName("encoding");
     private static final QName _auth_method = new QName("auth-method");
+
+    private static final String library_xpl = "http://xmlcalabash.com/extension/steps/marklogic-xcc.xpl";
 
     private ReadablePipe source = null;
     private WritablePipe result = null;
@@ -201,5 +210,48 @@ public class XCCInsertDocument extends DefaultStep {
         tree.addEndElement();
         tree.endDocument();
         result.write(tree.getResult());
+    }
+
+    public static void configureStep(XProcRuntime runtime) {
+        XProcURIResolver resolver = runtime.getResolver();
+        URIResolver uriResolver = resolver.getUnderlyingURIResolver();
+        URIResolver myResolver = new StepResolver(uriResolver);
+        resolver.setUnderlyingURIResolver(myResolver);
+    }
+
+    private static class StepResolver implements URIResolver {
+        Logger logger = LoggerFactory.getLogger(XCCInsertDocument.class);
+        URIResolver nextResolver = null;
+
+        public StepResolver(URIResolver next) {
+            nextResolver = next;
+        }
+
+        @Override
+        public Source resolve(String href, String base) throws TransformerException {
+            try {
+                URI baseURI = new URI(base);
+                URI xpl = baseURI.resolve(href);
+                if (library_xpl.equals(xpl.toASCIIString())) {
+                    URL url = XCCInsertDocument.class.getResource("/library.xpl");
+                    logger.debug("Reading library.xpl for ml:insert-document from " + url);
+                    InputStream s = XCCInsertDocument.class.getResourceAsStream("/library.xpl");
+                    if (s != null) {
+                        SAXSource source = new SAXSource(new InputSource(s));
+                        return source;
+                    } else {
+                        logger.info("Failed to read library.xpl for ml:insert-document");
+                    }
+                }
+            } catch (URISyntaxException e) {
+                // nevermind
+            }
+
+            if (nextResolver != null) {
+                return nextResolver.resolve(href, base);
+            } else {
+                return null;
+            }
+        }
     }
 }
