@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/ndw/xmlcalabash1-xcc.svg?branch=master)](https://travis-ci.org/ndw/xmlcalabash1-xcc.svg?branch=master)
 
 This repository contains
-[XML Calabash 1.0](http://github.com/ndw/xmlcalabash1) 1.0 extension
+[XML Calabash 1.0](http://github.com/ndw/xmlcalabash1) extension
 steps that can read, write, and query
 [MarkLogic Server](http://marklogic.com/).
 
