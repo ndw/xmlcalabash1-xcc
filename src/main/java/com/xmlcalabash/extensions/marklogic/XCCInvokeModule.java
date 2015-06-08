@@ -58,6 +58,7 @@ public class XCCInvokeModule extends DefaultStep {
     private static final QName _auth_method = new QName("auth-method");
 
     private static final String library_xpl = "http://xmlcalabash.com/extension/steps/marklogic-xcc.xpl";
+    private static final String library_url = "/com/xmlcalabash/extensions/xcc/library.xpl";
 
     private WritablePipe result = null;
     private Hashtable<QName,String> params = new Hashtable<QName, String> ();
@@ -182,14 +183,14 @@ public class XCCInvokeModule extends DefaultStep {
                 URI baseURI = new URI(base);
                 URI xpl = baseURI.resolve(href);
                 if (library_xpl.equals(xpl.toASCIIString())) {
-                    URL url = XCCInvokeModule.class.getResource("/library.xpl");
+                    URL url = XCCInvokeModule.class.getResource(library_url);
                     logger.debug("Reading library.xpl for ml:invoke-module from " + url);
-                    InputStream s = XCCInvokeModule.class.getResourceAsStream("/library.xpl");
+                    InputStream s = XCCInvokeModule.class.getResourceAsStream(library_url);
                     if (s != null) {
                         SAXSource source = new SAXSource(new InputSource(s));
                         return source;
                     } else {
-                        logger.info("Failed to read library.xpl for ml:invoke-module");
+                        logger.info("Failed to read " + library_url + " for ml:invoke-module");
                     }
                 }
             } catch (URISyntaxException e) {
