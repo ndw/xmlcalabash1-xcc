@@ -1,0 +1,9 @@
+<xdbc-server-properties xmlns="http://marklogic.com/manage">
+  <server-name>xmlcalabash-xdbc-test-server</server-name>
+  <group-name>Default</group-name>
+  <server-type>xdbc</server-type>
+  <enabled>true</enabled>
+  <content-database>Documents</content-database>
+  <root>{$root}</root>
+  <port>{$port}</port>
+</xdbc-server-properties>
