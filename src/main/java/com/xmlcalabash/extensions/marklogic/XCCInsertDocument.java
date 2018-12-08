@@ -48,55 +48,21 @@ import org.xml.sax.InputSource;
         name = "ml:insert-document",
         type = "{http://xmlcalabash.com/ns/extensions/marklogic}insert-document")
 
-public class XCCInsertDocument extends DefaultStep {
-    private static final QName _user = new QName("","user");
-    private static final QName _password = new QName("","password");
-    private static final QName _host = new QName("","host");
-    private static final QName _port = new QName("","port");
-    private static final QName _contentBase = new QName("","content-base");
+public class XCCInsertDocument extends XCCStep {
+    private static final QName _encoding = new QName("encoding");
     private static final QName _bufferSize = new QName("","buffer-size");
     private static final QName _collections = new QName("","collections");
     private static final QName _format = new QName("","format");
     private static final QName _language = new QName("","language");
     private static final QName _locale = new QName("","locale");
     private static final QName _uri = new QName("","uri");
-    private static final QName _encoding = new QName("encoding");
-    private static final QName _auth_method = new QName("auth-method");
 
-    private static final String library_xpl = "http://xmlcalabash.com/extension/steps/marklogic-xcc.xpl";
-    private static final String library_url = "/com/xmlcalabash/extensions/xcc/library.xpl";
-
-    private ReadablePipe source = null;
-    private WritablePipe result = null;
-
-    /**
-     * Creates a new instance of Identity
-     */
     public XCCInsertDocument(XProcRuntime runtime, XAtomicStep step) {
         super(runtime,step);
     }
 
-    public void setInput(String port, ReadablePipe pipe) {
-        source = pipe;
-    }
-
-    public void setOutput(String port, WritablePipe pipe) {
-        result = pipe;
-    }
-
-    public void reset() {
-        source.resetReader();
-        result.resetWriter();
-    }
-
     public void run() throws SaxonApiException {
         super.run();
-
-        String host = getOption(_host, "");
-        int port = getOption(_port, 0);
-        String user = getOption(_user, "");
-        String password = getOption(_password, "");
-        String contentBase = getOption(_contentBase, "");
 
         String format = "xml";
         if (getOption(_format) != null) {
@@ -177,26 +143,10 @@ public class XCCInsertDocument extends DefaultStep {
             content = ContentFactory.newContent(dburi, docbinary, options);
         }
 
-        ContentSource contentSource;
+        ContentSource contentSource = constructContentSource();
 
         try {
-            if ("".equals(contentBase)) {
-                contentSource = ContentSourceFactory.newContentSource(host, port, user, password);
-            } else {
-                contentSource = ContentSourceFactory.newContentSource(host, port, user, password, contentBase);
-            }
-        } catch (Exception e) {
-            throw new XProcException(e);
-        }
-
-        if ("basic".equals(getOption(_auth_method, ""))) {
-            contentSource.setAuthenticationPreemptive(true);
-        }
-
-        Session session;
-
-        try {
-            session = contentSource.newSession ();
+            Session session = contentSource.newSession ();
             session.insertContent(content);
             session.close();
         } catch (Exception e) {
