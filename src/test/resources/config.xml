@@ -2,6 +2,7 @@
   <user>admin</user>
   <password>admin</password>
   <host>localhost</host>
-  <root>/projects/xmlcalabash/ext/xmlcalabash1-xcc/src/test/resources/marklogic</root>
+  <!-- N.B. This directory must be accessible on the server! -->
+  <root>/Users/ndw/Projects/xmlcalabash/ext/xmlcalabash1-xcc/src/test/resources/marklogic</root>
   <port>8123</port>
 </config>

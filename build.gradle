@@ -10,8 +10,7 @@ buildscript {
 
 plugins {
   id "java"
-  id "osgi"
-  id "maven"
+  id "maven-publish"
   id "signing"
 }
 
@@ -23,38 +22,35 @@ repositories {
 
 configurations {
   copydep {
-    extendsFrom runtime
+    extendsFrom implementation
   }
   copydep.exclude module: 'xmlcalabash'
   copydep.exclude module: 'nwalsh-annotations'
 }
 
 dependencies {
-  compile (
-    [group: 'com.marklogic', name: 'marklogic-xcc', version: '9.0.7'],
-    [group: 'com.nwalsh', name: 'nwalsh-annotations', version: '1.0.0'],
-    [group: 'com.xmlcalabash', name: 'xmlcalabash', version: '1.1.22-98'],
+  implementation (
+    [group: 'com.marklogic', name: 'marklogic-xcc', version: '10.0.3'],
+    [group: 'com.nwalsh', name: 'nwalsh-annotations', version: '1.0.1'],
+    [group: 'com.xmlcalabash', name: 'xmlcalabash', version: xmlCalabashVersion],
   )
 }
 
 // Variables
 project.ext.saxonRelease = saxonVersion.substring(0,5)
 project.ext.saxonBranch  = saxonVersion.substring(0,3).replaceAll("\\.", "")
-project.ext.releaseVersion = version
-project.ext.distVersion = version + snapshot
-version = project.ext.distVersion // - gets turned into . in some contexts
+project.ext.releaseVersion = relVersion
+project.ext.distVersion = relVersion + snapshot
+relVersion = project.ext.distVersion // - gets turned into . in some contexts
 
-// Make explicit use of annotationProcessorPath to satisfy Gradle.
-// Maybe it's possible to do better than "configurations.compile", but the
-// implementation uses annotations to find step implementations, so there's
-// going to be a lot of them.
 compileJava {
-    options.compilerArgs += ['-Xlint:deprecation']
-    options.annotationProcessorPath = configurations.compile
+  options.deprecation = true
+  options.compilerArgs += ['-Xlint:deprecation']
+  options.annotationProcessorPath = configurations.compileClasspath
 }
 
 compileTestJava {
-    options.annotationProcessorPath = configurations.compile
+  options.annotationProcessorPath = configurations.compile
 }
 
 task copyLib(type: Copy) {
@@ -70,22 +66,23 @@ task copyLib(type: Copy) {
 }
 
 jar {
+  archiveBaseName = "xmlcalabash1-xcc-" + relVersion
   manifest {
-    instruction 'Built-By', builtBy
-    instruction 'Implementation-Vendor', 'Norman Walsh'
-    instruction 'Implementation-Title', 'XML Calabash MarkLogic XCC Steps'
-    instruction 'Implementation-Version', distVersion
-    instruction 'Bundle-SymbolicName', 'com.xmlcalabash.extensions.marklogic'
-    instruction 'Bundle-RequiredExecutionEnvironment', 'J2SE-1.7'
-    instruction 'Export-Package', '*, etc'
-    instruction 'Import-Package', 'net.sf.saxon.*;version=' + project.ext.saxonRelease + ',\
+    attributes 'Built-By': builtBy
+    attributes 'Implementation-Vendor': 'Norman Walsh'
+    attributes 'Implementation-Title': 'XML Calabash MarkLogic XCC Steps'
+    attributes 'Implementation-Version': distVersion
+    attributes 'Bundle-SymbolicName': 'com.xmlcalabash.extensions.marklogic'
+    attributes 'Bundle-RequiredExecutionEnvironment': 'J2SE-1.7'
+    attributes 'Export-Package': '*, etc'
+    attributes 'Import-Package': 'net.sf.saxon.*;version=' + project.ext.saxonRelease + ',\
   javax.crypto.*,\
   javax.xml.*,\
   org.apache.commons.httpclient.*,\
   org.xml.sax.*,\
   *;resolution:=optional'
-    instruction 'DynamicImport-Package', '*'
-    instruction 'Class-Path', project.ext.runtimeClasspath + " lib"
+    attributes 'DynamicImport-Package': '*'
+    attributes 'Class-Path': project.ext.runtimeClasspath + " lib"
   }
 }
 
@@ -127,7 +124,7 @@ task copyJavaDoc(dependsOn: javadoc, type: Copy) {
 }
 
 task testSetup(type: JavaExec) {
-  classpath = configurations.copydep + configurations.runtime \
+  classpath = configurations.copydep + configurations.runtimeClasspath \
               + sourceSets.main.output
 
   main = 'com.xmlcalabash.drivers.Main'
@@ -136,7 +133,7 @@ task testSetup(type: JavaExec) {
 }
 
 task testAdhoc(type: JavaExec, dependsOn: [ "testSetup" ]) {
-  classpath = configurations.copydep + configurations.runtime \
+  classpath = configurations.copydep + configurations.runtimeClasspath \
               + sourceSets.main.output
 
   main = 'com.xmlcalabash.drivers.Main'
@@ -146,7 +143,7 @@ task testAdhoc(type: JavaExec, dependsOn: [ "testSetup" ]) {
 test.dependsOn testAdhoc
 
 task testInvoke(type: JavaExec, dependsOn: [ "testSetup" ]) {
-  classpath = configurations.copydep + configurations.runtime \
+  classpath = configurations.copydep + configurations.runtimeClasspath \
               + sourceSets.main.output
 
   systemProperties System.properties
@@ -157,7 +154,7 @@ task testInvoke(type: JavaExec, dependsOn: [ "testSetup" ]) {
 test.dependsOn testInvoke
 
 task testInsert(type: JavaExec, dependsOn: [ "testSetup" ]) {
-  classpath = configurations.copydep + configurations.runtime \
+  classpath = configurations.copydep + configurations.runtimeClasspath \
               + sourceSets.main.output
 
   main = 'com.xmlcalabash.drivers.Main'
@@ -175,64 +172,65 @@ task makeDist(dependsOn: [ build, copyJar, copyLib ]) {
 task zipDist(dependsOn: makeDist, type: Zip) {
   from('build/dist')
   into 'xmlcalabash1-xcc-' + distVersion
-  archiveName 'xmlcalabash1-xcc-' + distVersion + ".zip"
+  archiveFileName = 'xmlcalabash1-xcc-' + distVersion + ".zip"
 }
 
 task dist(dependsOn: [test, zipDist]) {
   // nop
 }
 
-artifacts {
-  archives javadocJar
-  archives sourcesJar
-}
-
 signing {
-  required { gradle.taskGraph.hasTask("uploadArchives") }
-  sign configurations.archives
+  sign publishing.publications
 }
 
-uploadArchives {
-  repositories {
-    mavenDeployer {
-      beforeDeployment { MavenDeployment deployment ->
-        signing.signPom(deployment) }
-
-      repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-        authentication(userName: sonatypeUsername, password: sonatypePassword)
-      }
-
-      snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-        authentication(userName: sonatypeUsername, password: sonatypePassword)
-      }
-
-      pom.project {
-        name 'XML Calabash MarkLogic XCC Steps'
-        packaging 'jar'
-        description 'XML Calabash extension steps to communicate with MarkLogic server'
-        url 'https://github.com/ndw/xmlcalabash1-xcc'
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      pom {
+        name = 'XML Calabash MarkLogic XCC Steps'
+        packaging = 'jar'
+        description = 'XML Calabash extension steps to communicate with MarkLogic server'
+        url = 'https://github.com/ndw/xmlcalabash1-xcc'
 
         scm {
-          url 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
-          connection 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
-          developerConnection 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
+          url = 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
+          connection = 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
+          developerConnection = 'scm:git@github.com:ndw/xmlcalabash1-xcc.git'
         }
 
         licenses {
           license {
-            name 'The Apache Software License, Version 2.0'
-            url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-            distribution 'repo'
+            name = 'The Apache Software License, Version 2.0'
+            url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            distribution = 'repo'
           }
         }
 
         developers {
           developer {
-            id 'ndw'
-            name 'Norman Walsh'
+            id = 'ndw'
+            name = 'Norman Walsh'
           }
         }
+      }
+
+      groupId = "com.xmlcalabash"
+      artifactId = "xmlcalabash1-xcc"
+      version = relVersion
+      from components.java
+      artifact javadocJar
+      artifact sourcesJar
+    }
+  }
+
+  repositories {
+    maven {
+      url = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+      credentials {
+        username = sonatypeUsername
+        password = sonatypePassword
       }
     }
   }
 }
+
